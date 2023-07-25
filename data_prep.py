@@ -1,31 +1,42 @@
 #%%
 import pandas as pd
-import pyodbc
-from sqlSelectToDataFrame import sqlSelectToDataFrame
 from sklearn.preprocessing import StandardScaler
-
-# %% read data from database
-df_items_clients_orig=sqlSelectToDataFrame('sql_select.sql',0)
-
-#%% drop unnecessary columns
-columns_to_drop=['Valoare','Qty']
-df_items_clients=df_items_clients_orig.drop(columns=columns_to_drop)
-columns_to_drop_existing = [col for col in columns_to_drop if col in df_items_clients.columns]
-df_items_clients.drop(columns_to_drop_existing, axis=1)
-df_items_clients=df_items_clients[df_items_clients['NrDoc'] >= 1]
-
-#%% standarize NrDoc value
-scaler = StandardScaler()
-df_items_clients['NrDocStd'] = df_items_clients.groupby('ClientId')['NrDoc'].transform(lambda x: scaler.fit_transform(x.values.reshape(-1, 1)).flatten())
-
-#%%save result to excel
-df_items_clients['Campain']='2023LichidareStoc'
-df_items_clients.to_excel('filtered_data.xlsx', index=False)
-
-#-----------------------Statistics and representation--------------------------------------------------------------------
+from sqlSelectToDataFrame import sqlSelectToDataFrame
 
 #%%
-item_stats = df_items_clients.groupby('ItemId')['NrDoc'].agg(['mean', 'std','count'])
-item_stats= item_stats.sort_values('count', ascending=False)
+class ClientItemsRank:
+    def __init__(self):
+        self.df_items_clients = None
+
+    def get_data_from_sql(self, sql_filename, nr_of_sql):
+        self.df_items_clients = sqlSelectToDataFrame(sql_filename, nr_of_sql)
+
+    def drop_unnecessary_columns(self, columns_to_drop):
+        columns_to_drop_existing = [col for col in columns_to_drop if col in self.df_items_clients.columns]
+        if len(columns_to_drop_existing) > 0:
+            self.df_items_clients.drop(columns_to_drop_existing, axis=1, inplace=True)
+
+    def filter_empty_line(self):
+        self.df_items_clients = self.df_items_clients[self.df_items_clients['NrDoc'] >= 1]
+
+    def standardize_nr_doc_value(self):
+        scaler = StandardScaler()
+        self.df_items_clients['NrDocStd'] = self.df_items_clients.groupby('ClientId')['NrDoc'].transform(
+            lambda x: scaler.fit_transform(x.values.reshape(-1, 1)).flatten()
+        )
+
+    def generate_standardized_rank(self, sql_filename, nr_of_sql, columns_to_drop):
+        self.get_data_from_sql(sql_filename, nr_of_sql)
+        self.drop_unnecessary_columns(columns_to_drop)
+        self.filter_empty_line()
+        self.standardize_nr_doc_value()
+        return self.df_items_clients
+#%%
+item_rank_processor = ClientItemsRank()
+item_rank = item_rank_processor.generate_standardized_rank('sql_select.sql', 0, ['Valoare', 'Qty'])
+#%%
+sintetic_rank_processor = ClientItemsRank()
+sintetic_rank = sintetic_rank_processor.generate_standardized_rank('sql_select.sql', 0, ['Valoare', 'Qty'])
 
 
+# %%
