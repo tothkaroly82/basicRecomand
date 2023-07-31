@@ -1,3 +1,4 @@
+-- 0 a kivalasztott termekekre osszegzem az eladasi adatokat
 Declare @Dela as date='2018-01-01'
 Declare @PanaLA as date='2023-06-30'
 Declare @PromCode as varchar(20)='2023LichidareStoc'
@@ -19,6 +20,7 @@ left join (select s.INVOICEACCOUNT ClientId, s.ItemId, sum(s.LINEAMOUNTMST) Valo
 
 order by lp.ITEMID
 ;
+--- 1 szintetikusra osszegzem a kivalasztott termek eladasokat
 Declare @Dela as date='2018-01-01'
 Declare @PanaLA as date='2023-06-30'
 Declare @PromCode as varchar(20)='2023LichidareStoc'
@@ -42,4 +44,7 @@ select lp.ITEMID ItemId
 				) s on s.Sintetic=i.Sintetic
 
 
-order by lp.ITEMID
+order by lp.ITEMID;
+---2
+select *
+from ProductCampaigns.dbo.client_product_campaign

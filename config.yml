@@ -1,5 +1,11 @@
-server: mdbwh
-database: DaxDBWH
+server: 
+  mdbwh: mdbwh
+database: 
+  DaxDBWH: DaxDBWH
+  ProductCampaigns: ProductCampaigns
 credentials:
   username: bpc.softs
   password: '!ConTroll@ing6'
+
+
+ 
