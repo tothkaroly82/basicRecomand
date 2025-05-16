@@ -37,25 +37,22 @@ class ClientItemsRank:
 item_rank_processor = ClientItemsRank()
 rank_byitems = item_rank_processor.generate_standardized_rank('sql_select.sql', 0, ['Qty'])
 
-#%%
 sintetic_rank_processor = ClientItemsRank()
 rank_bysintetic = sintetic_rank_processor.generate_standardized_rank('sql_select.sql', 1, ['Qty'])
-
-
-# %% merge df
+    # merge df
 clients_ranks = rank_bysintetic.merge(rank_byitems, on=['ItemId', 'ClientId'], how='outer', suffixes=('_sintetic', '_item'))
 
-#%% create weighted global rank based on sintetic rank and item rank
-clients_ranks['Score global']=0.9*clients_ranks['NrDocStd_item'].fillna(0)+0.1*clients_ranks['NrDocStd_sintetic'].fillna(0)
+    #c reate weighted global rank based on sintetic rank and item rank
+clients_ranks['Score global']=0.7*clients_ranks['NrDocStd_item'].fillna(0)+0.3*clients_ranks['NrDocStd_sintetic'].fillna(0)
 clients_ranks['Rank'] = clients_ranks.groupby('ClientId')['Score global'].rank(method='first', ascending=False)
 clients_ranks = clients_ranks.sort_values(by=['Score global', 'Valoare_item', 'Valoare_sintetic','ItemId'], ascending=[False, False,False, True])
 clients_ranks = clients_ranks.reset_index(drop=True)
 
-#----- save results to database--------------------------------------------------------------------------
-#%% filter products with rank less than 49
-rank_lower48=clients_ranks[clients_ranks['Rank'] <=48]
+    #save results to database--------------------------------------------------------------------------
+    # filter products with rank less than 49
+rank_lower48=clients_ranks[clients_ranks['Rank'] <=96]
 
-#%% # rename columns to map name`s of database table and drop unnecesary columns
+    ## rename columns to map name`s of database table and drop unnecesary columns
 rank_lower48['CampaignId']='2023LichidareStoc'
 rank_lower48['Price']=None
 rank_lower48['unit']=None
@@ -73,31 +70,43 @@ column_mapping = {
 }
 
 rank_lower48.rename(columns=column_mapping, inplace=True)
-# keep only necesary columns
+    # keep only necesary columns
 columns_to_keep = list(column_mapping.values())
 rank_lower48 = rank_lower48[columns_to_keep]
 desired_columns_order = ['client_dax_id', 'product_dax_id', 'campaign_dax_id', 'price', 'score', 'sent', 'unit']
 rank_lower48 = rank_lower48.reindex(columns=desired_columns_order)
 
 
-#%% delete existing data
+#%% populate database
+    # create connection
 connection_string=ss.create_connection_string('mdbwh','ProductCampaigns')
-ss.delete_data_from_table(connection_string,'client_product_campaign')
-#%%
 
-#%% insert data
-ss.save_dataframe_to_sql(rank_lower48,'client_product_campaign',connection_string)
+    # delete data from campain table
+ss.delete_data_from_table(connection_string,'client_product_campaign_duplicate')
 
-
-#------------------save results end-------------
+    # insert data
+ss.save_dataframe_to_sql(rank_lower48,'client_product_campaign_duplicate',connection_string)
 
 
-
-#%%
 #%% generate statistics
-item_rank_statistics = rank_lower48.groupby('ItemId')
-item_rank_statistic = item_rank_statistics['Rank'].agg(['mean', 'min', 'max', 'std','count'])
+item_stats = rank_lower48.groupby('product_dax_id').agg(
+    client_count=('client_dax_id', 'nunique'),
+    score_25th=('score', lambda x: x.quantile(0.25)),
+    score_50th=('score', lambda x: x.quantile(0.50)),
+    score_75th=('score', lambda x: x.quantile(0.75))
+).reset_index()
 
+# --- CLIENT-LEVEL STATISTICS ---
+client_stats = rank_lower48.groupby('client_dax_id').agg(
+    product_count=('product_dax_id', 'nunique'),
+    score_25th=('score', lambda x: x.quantile(0.25)),
+    score_50th=('score', lambda x: x.quantile(0.50)),
+    score_75th=('score', lambda x: x.quantile(0.75))
+).reset_index()
 
+# --- SAVE TO EXCEL ---
+with pd.ExcelWriter('rank_statistics.xlsx', engine='xlsxwriter') as writer:
+    item_stats.to_excel(writer, sheet_name='item', index=False)
+    client_stats.to_excel(writer, sheet_name='client', index=False)
 
 # %%

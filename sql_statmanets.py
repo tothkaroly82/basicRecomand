@@ -10,7 +10,7 @@ def sqlSelectToDataFrame(sqlFile,queryNum):
     ; valasztjuk el a lekerdezeseket
     '''
     # read credentials from confiq
-    with open("config.yml", 'r') as stream:
+    with open("credentials.yml", 'r') as stream:
         try:
             parsedYaml=yaml.safe_load(stream)
         except yaml.YAMLError as exc:
@@ -24,7 +24,7 @@ def sqlSelectToDataFrame(sqlFile,queryNum):
     conn = pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER='+server+';DATABASE='+database+';UID='+username+';PWD='+ password)
     fd = open(sqlFile, 'r')
     query = fd.read()
-    query=query.split(';')[queryNum]
+    query=query.split('##')[queryNum]
     fd.close()  
     df_query = pd.read_sql_query(query,conn)
     return df_query
@@ -47,7 +47,7 @@ def delete_data_from_table(connection_string, destination_table):
         print("Error:", e)
 
 def create_connection_string(server, db):
-    with open("config.yml", 'r') as stream:
+    with open("credentials.yml", 'r') as stream:
         try:
             parsedYaml=yaml.safe_load(stream)
         except yaml.YAMLError as exc:
